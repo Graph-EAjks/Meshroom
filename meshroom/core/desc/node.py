@@ -258,6 +258,9 @@ class Node(BaseNode):
 
     def processChunkInEnvironment(self, chunk):
         meshroomComputeCmd = f"python {_MESHROOM_COMPUTE} {chunk.node.graph.filepath} --node {chunk.node.name} --extern --inCurrentEnv"
+        if getattr(sys, "frozen", False):
+            meshroomComputeCmd = f"{_MESHROOM_COMPUTE} {chunk.node.graph.filepath} --node {chunk.node.name} --extern --inCurrentEnv"
+
         if len(chunk.node.getChunks()) > 1:
             meshroomComputeCmd += f" --iteration {chunk.range.iteration}"
 
