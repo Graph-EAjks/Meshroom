@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import glob
 import importlib
+import json
 import logging
 import os
 import sys
@@ -8,7 +10,6 @@ import sys
 from enum import Enum
 from inspect import getfile
 from pathlib import Path
-import glob
 
 from meshroom.common import BaseObject
 from meshroom.core import desc
@@ -215,6 +216,7 @@ class Plugin(BaseObject):
         self._processEnv: ProcessEnv = ProcessEnv(path)
 
         self.loadTemplates()
+        self.loadConfig()
 
     @property
     def name(self):
@@ -284,6 +286,47 @@ class Plugin(BaseObject):
         for file in os.listdir(self.path):
             if file.endswith(".mg"):
                 self._templates[os.path.splitext(file)[0]] = os.path.join(self.path, file)
+
+    def loadConfig(self):
+        """
+        Load the plugin's configuration file if it exists, and set all the environment variables
+        it contains. The configuration file is expected to be named "config.json", located at the
+        top-level of the plugin.
+        """
+        try:
+            with open(os.path.join(self.path, "config.json")) as config:
+                content = json.load(config)
+                for entry in content:
+                    # An entry is expected to be formatted as follows:
+                    # { "key": "key_of_var", "type": "type_of_value", "value": "var_value" }
+                    # If "type" is not provided, it is assumed to be "string"
+                    k = entry.get("key", None)
+                    t = entry.get("type", None)
+                    val = entry.get("value", None)
+
+                    if k and val:
+                        if t == "path":
+                            if os.path.isabs(val):
+                                resolvedPath = Path(val).resolve()
+                            else:
+                                resolvedPath = Path(os.path.join(self.path, val)).resolve()
+                            if resolvedPath.exists():
+                                val = resolvedPath.as_posix()
+
+                        # Do not overwrite env variables: if the user has already defined them by
+                        # hand, then that value should take precedence over the one in the config
+                        # file.
+                        if not os.getenv(k, None):
+                            os.environ[k] = str(val)
+                    else:
+                        logging.warning(f"Invalid entry in configuration file for {self.name}: {entry}.")
+
+        except FileNotFoundError:
+            logging.debug(f"No configuration file 'config.json' was found for {self.name}.")
+        except json.JSONDecodeError as err:
+            logging.error(f"Malformed JSON in the configuration file for {self.name}: {err}")
+        except IOError as err:
+            logging.error(f"Error while accessing the configuration file for {self.name}: {err}")
 
     def containsNodePlugin(self, name: str) -> bool:
         """
