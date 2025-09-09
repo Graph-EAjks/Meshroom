@@ -915,6 +915,9 @@ class GroupAttribute(Attribute):
 
     # Override
     def _setValue(self, exportedValue):
+        if self._handleLinkValue(exportedValue):
+            return
+
         value = self.validateValue(exportedValue)
         if isinstance(value, dict):
             # set individual child attribute values
@@ -930,8 +933,11 @@ class GroupAttribute(Attribute):
 
     # Override
     def _applyExpr(self):
-        for value in self._value:
-            value._applyExpr()
+        if self._linkExpression:
+            super()._applyExpr()
+        else:
+            for value in self._value:
+                value._applyExpr()
 
     # Override
     def resetToDefaultValue(self):
@@ -944,6 +950,8 @@ class GroupAttribute(Attribute):
 
     # Override
     def getSerializedValue(self):
+        if self.inputLink:
+            return self.inputLink.asLinkExpr()
         return {key: attr.getSerializedValue() for key, attr in self._value.objects.items()}
 
     # Override
@@ -976,6 +984,9 @@ class GroupAttribute(Attribute):
 
     # Override
     def upgradeValue(self, exportedValue):
+        if self._handleLinkValue(exportedValue):
+            return
+
         value = self.validateValue(exportedValue)
         if isinstance(value, dict):
             # set individual child attribute values
@@ -992,6 +1003,9 @@ class GroupAttribute(Attribute):
 
     # Override
     def uid(self):
+        if self.isLink:
+            return super().uid()
+
         uids = []
         for k, v in self._value.items():
             if v.enabled and v.invalidate:
