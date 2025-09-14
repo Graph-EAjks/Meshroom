@@ -18,16 +18,15 @@ from .utils import registerNodeDesc, unregisterNodeDesc
 LOGGER = logging.getLogger("TestCompute")
 
 
-def executeChunks(node, tmpPath, size):
-    nodeCache = os.path.join(tmpPath, node.internalFolder)
-    os.makedirs(nodeCache)
+def executeChunks(node, size):
+    os.makedirs(node.internalFolder)
     logFiles = {}
     for chunkIndex in range(size):
         iteration = chunkIndex if size > 1 else -1
         logFileName = "log"
         if size > 1:
             logFileName = f"{chunkIndex}.log"
-        logFile = Path(nodeCache) / logFileName
+        logFile = Path(node.internalFolder) / logFileName
         logFiles[chunkIndex] = logFile
         logFile.touch()
         node.prepareLogger(iteration) 
@@ -97,7 +96,7 @@ class TestNodeLogger:
         graph._cacheDir = tmp_path
         node = graph.addNewNode(TestNodeA.__name__)
         # Compute
-        logFiles = executeChunks(node, tmp_path, 2)
+        logFiles = executeChunks(node, 2)
         for chunkId, logFile in logFiles.items():
             with open(logFile, "r") as f:
                 content = f.read()
@@ -109,7 +108,7 @@ class TestNodeLogger:
         graph._cacheDir = tmp_path
         node = graph.addNewNode(TestNodeB.__name__)
         # Compute
-        logFiles = executeChunks(node, tmp_path, 1)
+        logFiles = executeChunks(node, 1)
         for _, logFile in logFiles.items():
             with open(logFile, "r") as f:
                 content = f.read()
