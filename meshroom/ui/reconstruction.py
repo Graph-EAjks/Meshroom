@@ -455,6 +455,11 @@ class Reconstruction(UIGraph):
     def _onPluginsReloaded(self, nodeTypes: list):
         self._graph.reloadNodePlugins(nodeTypes)
         self.parent().showMessage("Plugins reloaded!", "ok")
+    
+    @Slot()
+    def printGraph(self):
+        for node, nodeInfo in self._graph.toDict().items():
+            print(f"[Node {nodeInfo['internalInputs']['label']}] ({node}) : {nodeInfo['parallelization']}")
 
     @Slot()
     @Slot(str)

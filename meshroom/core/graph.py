@@ -1427,6 +1427,7 @@ class Graph(BaseObject):
                 node.updateInternals()
 
     def updateStatusFromCache(self, force=False):
+        print("[Graph] (updateStatusFromCache)")
         for node in self._nodes:
             if node.dirty or force:
                 node.updateStatusFromCache()
@@ -1454,6 +1455,7 @@ class Graph(BaseObject):
             node.updateDuplicates(nodesPerUid)
 
     def update(self):
+        print("[Graph] (update)")
         if not self._updateEnabled:
             # To do the update once for multiple changes
             self._updateRequested = True
@@ -1557,6 +1559,7 @@ class Graph(BaseObject):
 
     @cacheDir.setter
     def cacheDir(self, value):
+        print("[Graph] (cacheDir.setter)")
         if self._cacheDir == value:
             return
         # use unix-style paths for cache directory

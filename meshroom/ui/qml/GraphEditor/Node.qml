@@ -215,6 +215,7 @@ Item {
 
     // Used to generate list of node's label sharing the same uid
     function generateDuplicateList() {
+        console.log("generateDuplicateList")
         let str = "<b>Shares internal folder (data) with:</b>"
         for (let i = 0; i < node.duplicates.count; ++i) {
             if (i % 5 === 0)
