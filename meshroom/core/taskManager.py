@@ -35,26 +35,26 @@ class TaskThread(QThread):
 
     def isRunning(self):
         return self._state == State.RUNNING
-    
+
     def waitForChunkCreation(self, node):
         if hasattr(node, "_chunksCreated") and node._chunksCreated:
             return True
-            
+
         loop = QEventLoop()
-        
+
         # A timer is used to make sure we don't indefinitely block the taskManager
         timer = QTimer()
         timer.timeout.connect(loop.quit)
         timer.setSingleShot(True)
         timer.start(1*60*1000)  # 1 min timeout
-        
+
         # Connect to completion signal
         def onChunksCreated(createdNode):
             if createdNode == node:
                 loop.quit()
-                
+
         self._manager.chunksCreated.connect(onChunksCreated)
-        
+
         try:
             # Start the event loop - will block until signal or timeout
             loop.exec()
@@ -77,7 +77,7 @@ class TaskThread(QThread):
             # skip already finished/running nodes
             if node.isFinishedOrRunning():
                 continue
-            
+
             # Request chunk creation if not already done
             if not (hasattr(node, "_chunksCreated") and node._chunksCreated):
                 self.createChunksSignal.emit(node)

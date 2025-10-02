@@ -66,7 +66,7 @@ class ExecMode(Enum):
 NodeChunkSetup = namedtuple("NodeChunks", ["blockSize", "fullSize", "nbBlocks"])
 
 class NodeStatusData(BaseObject):
-    __slots__ = ("nodeName", "nodeType", "packageName", "packageVersion", "mrNodeType", "chunks")
+    __slots__ = ("nodeName", "nodeType", "packageName", "packageVersion", "mrNodeType", "chunks", "jobInfos")
 
     def __init__(self, nodeName='', nodeType='', packageName='', packageVersion='',
                  mrNodeType: MrNodeType = MrNodeType.NONE, parent: BaseObject = None):
@@ -77,11 +77,18 @@ class NodeStatusData(BaseObject):
         self.packageVersion: str = packageVersion
         self.mrNodeType: MrNodeType = mrNodeType
         self.chunks: NodeChunkSetup = None
+        self.jobInfos: dict = {}
 
     def setNode(self, node):
         """ Set the node information from one node instance. """
         self.nodeName = node.name
         self.setNodeType(node)
+    
+    def setJob(self, jid, submitterName):
+        self.jobInfos = {
+            "jid": str(jid),
+            "submitterName": str(submitterName),
+        }
 
     def setNodeType(self, node):
         """
@@ -127,9 +134,9 @@ class NodeStatusData(BaseObject):
                 statusData = json.load(jsonFile)
             self.fromDict(statusData)
         except Exception as e:
-            logging.debug(f"updateNodeStatusFromCache({self.nodeName}): Error while loading status file {statusFile}: {e}")
+            logging.warning(f"[NodeStatusData] (loadFromCache) {self.nodeName}: Error while loading status file {statusFile}: {e}")
             self.reset()
-    
+
     @property 
     def nbChunks(self):
         nbBlocks = self.chunks.nbBlocks if self.chunks else -1
@@ -790,7 +797,7 @@ class BaseNode(BaseObject):
         self._duplicates = ListModel(parent=self)  # list of nodes with the same uid
         self._hasDuplicates: bool = False
         
-        self._status: NodeStatusData = NodeStatusData(self._name, nodeType, self.packageName,
+        self._nodestatus: NodeStatusData = NodeStatusData(self._name, nodeType, self.packageName,
                                                       self.packageVersion, self.getMrNodeType())
 
         self.globalStatusChanged.connect(self.updateDuplicatesStatusAndLocked)
@@ -1221,7 +1228,7 @@ class BaseNode(BaseObject):
         """ Delete this Node internal folder.
         Status will be reset to Status.NONE
         """
-        self._clearChunks()
+        self._resetChunks()
         if self.internalFolder and os.path.exists(self.internalFolder):
             try:
                 shutil.rmtree(self.internalFolder)
@@ -1335,16 +1342,13 @@ class BaseNode(BaseObject):
         for chunk in self._chunks:
             chunk.updateStatisticsFromCache()
 
-    def _clearChunks(self):
+    def _resetChunks(self):
         pass
 
     def _createChunksFromCache(self):
         pass
 
     def _createChunks(self):
-        pass
-
-    def _updateChunks(self):
         pass
 
     def _updateNodeSize(self):
@@ -1433,8 +1437,8 @@ class BaseNode(BaseObject):
 
         self._updateNodeSize()
 
-        # Update chunks splitting
-        self._clearChunks()  # self._updateChunks()
+        # Reset chunks splitting
+        self._resetChunks()
         # Retrieve current internal folder (if possible)
         try:
             folder = self.internalFolder
@@ -1472,26 +1476,28 @@ class BaseNode(BaseObject):
         # TODO : integrate statusFileLastModTime ?
         Returns True if a change on the chunk setup has been detected
         """
+        print("[BaseNode] (updateNodeStatusFromCache)", self.label)
         chunksRangeHasChanged = False
         # No status file => reset status to Status.None
         if os.path.exists(self.nodeStatusFile):
-            oldChunkSetup = self._status.chunks
-            self._status.loadFromCache(self.nodeStatusFile)
-            if self._status.chunks != oldChunkSetup:
+            oldChunkSetup = self._nodestatus.chunks
+            self._nodestatus.loadFromCache(self.nodeStatusFile)
+            if self._nodestatus.chunks != oldChunkSetup:
                 chunksRangeHasChanged = True
         else:
-            self._status.reset()
-        self._status.setNodeType(self)
+            self._nodestatus.reset()
+        self._nodestatus.setNodeType(self)
         return chunksRangeHasChanged
 
     def updateStatusFromCache(self):
         """
         Update node status based on status file content/existence.
         """
+        print("[BaseNode] (updateStatusFromCache)", self.label)
         # Update nodeStatus from cache
         chunkChanged = self.updateNodeStatusFromCache()
         # Create chunks if we found info on them on the node cache
-        if chunkChanged and self._status.nbChunks > 0:
+        if chunkChanged and self._nodestatus.nbChunks > 0:
             # Update number of chunks
             try:
                 self._createChunksFromCache()
@@ -1508,7 +1514,7 @@ class BaseNode(BaseObject):
         """
         Write node status on disk.
         """
-        data = self._status.toDict()
+        data = self._nodestatus.toDict()
         statusFilepath = self.nodeStatusFile
         folder = os.path.dirname(statusFilepath)
         os.makedirs(folder, exist_ok=True)
@@ -1516,6 +1522,11 @@ class BaseNode(BaseObject):
         with open(statusFilepathWriting, 'w') as jsonFile:
             json.dump(data, jsonFile, indent=4)
         renameWritingToFinalPath(statusFilepathWriting, statusFilepath)
+    
+    def setJobId(self, jid, submitterName):
+        print("[BaseNode] (setJobId)", self.label, "->", jid, f"({submitterName})")
+        self._nodestatus.setJob(jid, submitterName)
+        self.saveNodeStatusFile()
 
     def initStatusOnSubmit(self, forceCompute=False):
         """ Prepare chunks status when the node is in a graph that was submitted """
@@ -2067,31 +2078,105 @@ class Node(BaseNode):
             'outputs': outputs,
         }
 
-    def _clearChunks(self):
-        """ Setup a single chunk on the node """
+    def _resetChunks(self):
+        """ Set chunks on the node """
         if isinstance(self.nodeDesc, desc.InputNode):
             return
+        print("[Node] (_resetChunks)", self.label)
         # Disconnect signals
         for chunk in self._chunks:
             chunk.statusChanged.disconnect(self.globalStatusChanged)
-        # Reset chunks
-        self._chunksCreated = False
-        self.setSize(1)
-        self._chunks.setObjectList([NodeChunk(self, desc.Range())])
-        # Reconnect signals
-        self._chunks[0].statusChanged.connect(self.globalStatusChanged)
+        # Empty list
+        self._chunks.setObjectList([])
+        # Recreate list with reset values (1 chunk or the static size)
+        if not self.isParallelized:
+            self._chunksCreated = True
+            self.setSize(1)
+        elif isinstance(self.nodeDesc.size, desc.computation.StaticNodeSize):
+            self._chunksCreated = True
+            self.setSize(self.nodeDesc.size.computeSize(self))
+        else:
+            self._chunksCreated = False
+            self.setSize(1)
+        self._createStaticChunks()
+    
+    def _createStaticChunks(self):
+        print(f"[Node] (_createStaticChunks) <{self.label}> size={self.size}", end="")
+        if self.isParallelized:
+            print(" parallelized=1", end="")
+            try:
+                ranges = self.nodeDesc.parallelization.getRanges(self)
+                self._chunks.setObjectList([NodeChunk(self, range) for range in ranges])
+                for c in self._chunks:
+                    c.statusChanged.connect(self.globalStatusChanged)
+                logging.debug(f"Created {len(self._chunks)} chunks for node: {self.name}")
+            except RuntimeError:
+                # TODO: set node internal status to error
+                logging.warning(f"Invalid Parallelization on node {self._name}")
+                self._chunks.clear()
+        else:
+            print(" parallelized=0", end="")
+            self._chunks.setObjectList([NodeChunk(self, desc.Range())])
+            self._chunks[0].statusChanged.connect(self.globalStatusChanged)
+        print(" -> ranges =", [_c.range for _c in self._chunks])
         self.chunksChanged.emit()
         self.chunksCreatedChanged.emit()
 
     def _createChunksFromCache(self):
         """Create chunks when a node cache exists"""
+        print("[Node] (_createChunksFromCache)", self.label, end="")
         try:
             # Get size from cache
-            size = self._status.nbChunks
+            size = self._nodestatus.nbChunks
             self.setSize(size)
             if self.isParallelized:
                 try:
-                    ranges = self._status.getChunkRanges()
+                    ranges = self._nodestatus.getChunkRanges()
+                    if len(ranges) != len(self._chunks):
+                        self._chunks.setObjectList([NodeChunk(self, range) for range in ranges])
+                        for c in self._chunks:
+                            c.statusChanged.connect(self.globalStatusChanged)
+                        logging.debug(f"Created {len(self._chunks)} chunks for node: {self.name}")
+                    else: 
+                        for chunk, range in zip(self._chunks, ranges):
+                            chunk.range = range
+                except RuntimeError:
+                    # TODO: set node internal status to error
+                    logging.warning(f"Invalid Parallelization on node {self._name}")
+                    self._chunks.clear()
+            else:
+                if len(self._chunks) != 1:
+                    self._chunks.setObjectList([NodeChunk(self, desc.Range())])
+                    self._chunks[0].statusChanged.connect(self.globalStatusChanged)
+                else:
+                    self._chunks[0].range = desc.Range()
+            print(" -> ranges =", [_c.range for _c in self._chunks])
+            self._chunksCreated = True
+            self.chunksChanged.emit()
+            self.chunksCreatedChanged.emit()
+        except Exception as e:
+            logging.error(f"Failed to create chunks for {self.name}: {e}")
+            self._chunks.clear()
+            self._chunksCreated = False
+            raise e
+
+    def _createChunks(self):
+        """Create chunks when computation is about to start"""
+        print("[Node] (_createChunks)", self.label, end="")
+        if self._chunksCreated:
+            return
+        # logging.debug(f"Creating chunks for node: {self.name}")
+        if isinstance(self.nodeDesc, desc.InputNode):
+            self._chunksCreated = True
+            self.chunksChanged.emit()
+            return
+        try:
+            size = self.nodeDesc.size.computeSize(self)
+            print(f"-> size={size}")
+            self.setSize(size)
+            if self.isParallelized:
+                try:
+                    ranges = self.nodeDesc.parallelization.getRanges(self)
                     if len(ranges) != len(self._chunks):
                         self._chunks.setObjectList([NodeChunk(self, range) for range in ranges])
                         for c in self._chunks:
@@ -2111,26 +2196,6 @@ class Node(BaseNode):
                 else:
                     self._chunks[0].range = desc.Range()
             self._chunksCreated = True
-            self.chunksChanged.emit()
-            self.chunksCreatedChanged.emit()
-        except Exception as e:
-            logging.error(f"Failed to create chunks for {self.name}: {e}")
-            self._chunks.clear()
-            self._chunksCreated = False
-            raise e
-
-    def _createChunks(self):
-        """Create chunks when computation is about to start"""
-        if self._chunksCreated:
-            return
-        # logging.debug(f"Creating chunks for node: {self.name}")
-        if isinstance(self.nodeDesc, desc.InputNode):
-            self._chunksCreated = True
-            self.chunksChanged.emit()
-            return
-        try:
-            self._updateChunks()
-            self._chunksCreated = True
             # Emit signals for UI updates
             self.chunksChanged.emit()
             self.chunksCreatedChanged.emit()
@@ -2140,36 +2205,8 @@ class Node(BaseNode):
             self._chunksCreated = False
             raise e
         # Update status
-        self._status.setChunks(self._chunks)
+        self._nodestatus.setChunks(self._chunks)
         self.saveNodeStatusFile()
-
-    def _updateChunks(self):
-        """ Update Node's computation task splitting into NodeChunks based on its description """
-        if isinstance(self.nodeDesc, desc.InputNode):
-            return
-        size = self.nodeDesc.size.computeSize(self)
-        self.setSize(size)
-        if self.isParallelized:
-            try:
-                ranges = self.nodeDesc.parallelization.getRanges(self)
-                if len(ranges) != len(self._chunks):
-                    self._chunks.setObjectList([NodeChunk(self, range) for range in ranges])
-                    for c in self._chunks:
-                        c.statusChanged.connect(self.globalStatusChanged)
-                    logging.debug(f"Created {len(self._chunks)} chunks for node: {self.name}")
-                else: 
-                    for chunk, range in zip(self._chunks, ranges):
-                        chunk.range = range
-            except RuntimeError:
-                # TODO: set node internal status to error
-                logging.warning(f"Invalid Parallelization on node {self._name}")
-                self._chunks.clear()
-        else:
-            if len(self._chunks) != 1:
-                self._chunks.setObjectList([NodeChunk(self, desc.Range())])
-                self._chunks[0].statusChanged.connect(self.globalStatusChanged)
-            else:
-                self._chunks[0].range = desc.Range()
 
 
 class CompatibilityIssue(Enum):

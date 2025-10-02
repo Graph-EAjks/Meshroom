@@ -590,6 +590,8 @@ class UIGraph(QObject):
         nodes = [nodes] if not isinstance(nodes, Iterable) and nodes else nodes
         mrDefaultSubmitter = os.environ.get('MESHROOM_DEFAULT_SUBMITTER', '')
         chosenSubmitter = self.parent()._defaultSubmitterName or mrDefaultSubmitter
+        self.parent().showMessage(f"Submit job on farm through {chosenSubmitter}")
+        self.parent().showMessage(f"Nodes to submit : {nodes}")
         self._taskManager.submit(self._graph, chosenSubmitter, nodes, submitLabel=self.submitLabel)
 
     def updateGraphComputingStatus(self):

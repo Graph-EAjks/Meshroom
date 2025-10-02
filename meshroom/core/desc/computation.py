@@ -45,6 +45,9 @@ class Range:
             "rangeFullSize": self.fullSize,
             "rangeBlocksCount": self.nbBlocks
             }
+    
+    def __repr__(self):
+        return f"<Range {self.iteration}({self.blockSize})/{self.nbBlocks}({self.fullSize})>"
 
 
 class Parallelization:

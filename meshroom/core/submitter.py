@@ -10,7 +10,7 @@ class SubmitterOptionsEnum(IntFlag):
     INTERRUPT_JOB = auto()  # Can interrupt
     RESUME_JOB = auto()     # Can resume after interruption
     EDIT_TASKS = auto()     # Can edit tasks
-    
+
     @classmethod
     def get(cls, option):
         if isinstance(option, str):
@@ -30,35 +30,68 @@ class SubmitterOptions:
         self._options = 0
         for option in args:
             self.addOption(option)
-    
+
     def addOption(self, option):
         option = SubmitterOptionsEnum.get(option)
         self._options |= option
-    
-    def hasOption(self, option):
+
+    def includes(self, option):
         option = SubmitterOptionsEnum.get(option)
         return self._options & option > 0
-    
+
     def __iter__(self):
         for o in SubmitterOptionsEnum:
-            if self.hasOption(o):
+            if self.includes(o):
                 yield(o)
+
+    def __repr__(self):
+        if self._options == 0:
+            return f"<SubmitterOptions NONE>"
+        if self._options == SubmitterOptionsEnum.ALL:
+            return f"<SubmitterOptions ALL>"
+        return f"<SubmitterOptions {'|'.join([o.name for o in self])}>"
 
 
 class BaseSubmittedJob:
     """
     Interface to manipulate the job via Meshroom
     """
-    
+
     def __init__(self, jobId, submitter):
-        self.jobId = jobId
-        self.submitterOptions = submitter._options
+        self.jid = jobId
+        self.submitterName: str = submitter._name
+        self.submitterOptions: SubmitterOptions = submitter._options
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__} {self.jid}>"
+
+    def interruptJob(self):
+        if self.submitterOptions.includes(SubmitterOptionsEnum.INTERRUPT_JOB):
+            raise NotImplementedError("'interruptJob' method must be implemented in subclasses")
+        else:
+            raise RuntimeError(f"Submitter {self.__class__.__name__} cannot interrupt the job")
     
-    def interrupt(self):
-        raise NotImplementedError("'interrupt' method must be implemented in subclasses")
+    # TODO : interrupt for specific node/chunk
+
+    def resumeJob(self):
+        if self.submitterOptions.includes(SubmitterOptionsEnum.RESUME_JOB):
+            raise NotImplementedError("'resumeJob' method must be implemented in subclasses")
+        else:
+            raise RuntimeError(f"Submitter {self.__class__.__name__} cannot resume the job")
     
-    def resume(self):
-        raise NotImplementedError("'resume' method must be implemented in subclasses")
+    # TODO : resume for specific node/chunk
+
+    def restartErrorTasks(self):
+        if self.submitterOptions.includes(SubmitterOptionsEnum.RESUME_JOB):
+            raise NotImplementedError("'restartErrorTasks' method must be implemented in subclasses")
+        else:
+            raise RuntimeError(f"Submitter {self.__class__.__name__} cannot restart the job")
+
+    def addChunkTasks(self, node):
+        if self.submitterOptions.includes(SubmitterOptionsEnum.RESUME_JOB):
+            raise NotImplementedError("'addChunkTasks' method must be implemented in subclasses")
+        else:
+            raise RuntimeError(f"Submitter {self.__class__.__name__} cannot edit the job")
 
 
 class JobManager(BaseObject):
@@ -69,9 +102,15 @@ class JobManager(BaseObject):
         self._jobs = {}  # jobId -> BaseSubmittedJob
         self._nodeToJob = {}  # node uid -> Job
     
-    def addJob(self, job: BaseSubmittedJob):
-        if job.id not in self._jobs:
-            self._jobs[job.id] = job
+    def addJob(self, job: BaseSubmittedJob, nodes):
+        jid = job.jid
+        if jid not in self._jobs:
+            self._jobs[jid] = job
+        for node in nodes:
+            nodeUid = node._uid
+            self._nodeToJob[nodeUid] = jid
+            # Update the node status file to store the job ID
+            node.setJobId(jid, job.submitterName)
     
     def getJob(self, jobId: str) -> Optional[BaseSubmittedJob]:
         return self._jobs.get(jobId)
@@ -81,11 +120,6 @@ class JobManager(BaseObject):
             if jobId in self._jobs:
                 del self._jobs[jobId]
 
-    def addNodes(self, jobId, nodes):
-        for node in nodes:
-            nodeUid = node._uid
-            self._nodeToJob[nodeUid] = jobId
-    
     def getNodeJob(self, node):
         nodeUid = node._uid
         jobId = self._nodeToJob.get(nodeUid)
@@ -93,11 +127,12 @@ class JobManager(BaseObject):
             return self.getJob(jobId)
         return None
     
-    # TODO
-    # All the methods necessary to 
-    # - interrupt/resume job specific to a node/chunk
-    # - spool tasks, edit job
-    # - ...
+    def retreiveJob(self, submitter, jid) -> Optional[BaseSubmittedJob]:
+        if not submitter._options.includes(SubmitterOptionsEnum.RETRIEVE):
+            return None
+        job = submitter.retrieveJob(jid)
+        print(f"[JobManager] (retrieveJob) {jid} -> {job}")
+        return job
 
 
 # Global instance that manages submitted jobs
@@ -105,16 +140,18 @@ jobManager = JobManager()
 
 
 class BaseSubmitter(BaseObject):
-    def __init__(self, name, parent=None):
+    _options: SubmitterOptions = SubmitterOptions()
+    _name = ""
+    
+    def __init__(self, parent=None):
+        if not self._name:
+            raise ValueError("Could not register submitter without name")
         super().__init__(parent)
-        self._name = name
-        self._options: SubmitterOptions = SubmitterOptions()
-
-    def addOptions(self, options):
-        if not isinstance(options, list):
-            options = [options]
-        for option in options:
-            self._options.addOption(option)
+        print(f"Registered submitter {self._name} (options={self._options})")
+    
+    @property
+    def name(self):
+        return self._name
 
     def createJob(self, nodes, edges, filepath, submitLabel="{projectName}"):
         """ Submit the given graph
@@ -135,9 +172,8 @@ class BaseSubmitter(BaseObject):
         if not job:
             # Failed to create the job
             return False
-        if self._options.hasOption(SubmitterOptions.RETRIEVE):
-            jobManager.addJob(job)
-            jobManager.addNodes(job, nodes)
+        if isinstance(job, BaseSubmittedJob):
+            jobManager.addJob(job, nodes)
         return True
 
     name = Property(str, lambda self: self._name, constant=True)
