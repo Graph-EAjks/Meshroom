@@ -59,7 +59,10 @@ ListView {
             }
         }
 
-        onActiveChanged: height = active ? item.implicitHeight : -spacing
+        onActiveChanged: {
+            console.log("AttributeEditor: onActiveChanged")
+            height = active ? item.implicitHeight : -spacing
+        }
 
         Connections {
             target: item

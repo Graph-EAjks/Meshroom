@@ -414,6 +414,7 @@ Item {
                         range: { "min": 1, "max": listAttr ? listAttr.value.count : 0 }
 
                         onValueChanged: {
+                            console.log("onValueChanged")
                             if (listAttr === null) {
                                 return
                             }
@@ -581,6 +582,7 @@ Item {
 
                     // Cache computatibility/submitability status of each selected node.
                     readonly property var nodeSubmitOrComputeStatus: {
+                        console.log("nodeSubmitOrComputeStatus")
                         var collectedStatus = ({});
                         uigraph.nodeSelection.selectedIndexes.forEach(function(idx) {
                             const node = uigraph.graph.nodes.at(idx.row);
@@ -590,6 +592,7 @@ Item {
                     }
 
                     readonly property bool isSelectionFullyComputed: {
+                        console.log("isSelectionFullyComputed")
                         return uigraph.nodeSelection.selectedIndexes.every(function(idx) {
                             const node = uigraph.graph.nodes.at(idx.row);
                             return node.isComputed;
@@ -598,6 +601,7 @@ Item {
 
                     // Selection contains only compatibility nodes
                     readonly property bool isSelectionFullyCompatibility: {
+                        console.log("isSelectionFullyCompatibility")
                         return uigraph.nodeSelection.selectedIndexes.every(function(idx) {
                             const node = uigraph.graph.nodes.at(idx.row);
                             return node.isCompatibilityNode;
@@ -606,6 +610,7 @@ Item {
 
                     // Selection contains at least one computable node type
                     readonly property bool selectionContainsComputableNodeType: {
+                        console.log("selectionContainsComputableNodeType")
                         return uigraph.nodeSelection.selectedIndexes.some(function(idx) {
                             const node = uigraph.graph.nodes.at(idx.row);
                             return node.isComputableType;
@@ -613,6 +618,7 @@ Item {
                     }
 
                     readonly property bool canSelectionBeComputed: {
+                        console.log("canSelectionBeComputed")
                         if(!selectionContainsComputableNodeType)
                             return false;
                         if(isSelectionFullyCompatibility)
@@ -634,6 +640,7 @@ Item {
                     readonly property bool isSelectionSubmitable: uigraph.canSubmit && selectionContainsComputableNodeType
 
                     readonly property bool canSelectionBeSubmitted: {
+                        console.log("canSelectionBeSubmitted")
                         if(!selectionContainsComputableNodeType)
                             return false;
                         if(isSelectionFullyCompatibility)
@@ -887,10 +894,11 @@ Item {
                     onAttributePinDeleted: function(attribute, pin) { unregisterAttributePin(attribute, pin) }
 
                     onShaked: {
-                        uigraph.disconnectSelectedNodes();
+                        // uigraph.disconnectSelectedNodes();
                     }
 
                     onPressed: function(mouse) {
+                        console.log("onPressed")
                         nodeRepeater.updateSelectionOnClick = true;
                         nodeRepeater.ongoingDrag = true;
 
@@ -925,8 +933,10 @@ Item {
                         }
 
                         if(selectionMode != ItemSelectionModel.NoUpdate) {
+                            console.log("onPressed: A")
                             nodeRepeater.updateSelectionOnClick = false;
                             uigraph.selectNodeByIndex(index, selectionMode);
+                            console.log("onPressed: B")
                         }
 
                         // If the node is selected after this, make it the active selected node.
@@ -939,6 +949,7 @@ Item {
                             nodeMenuLoader.load(node)
                         }
 
+                        console.log("onPressed done")
                     }
 
                     onReleased: function(mouse, wasDragged) {

@@ -424,8 +424,12 @@ class UIGraph(QObject):
         self.updateChunks()
 
     def updateChunks(self):
+        print("[UIGraph] (updateChunks)")
         dfsNodes = self._graph.dfsOnFinish(None)[0]
-        chunks = self._graph.getChunks(dfsNodes)
+        chunks = []
+        for node in dfsNodes:
+            if hasattr(node, '_chunksCreated') and node._chunksCreated:
+                chunks.extend(node.getChunks())
         # Nothing has changed, return
         if self._sortedDFSChunks.objectList() == chunks:
             return
@@ -436,16 +440,19 @@ class UIGraph(QObject):
         for chunk in self._sortedDFSChunks:
             chunk.statusChanged.connect(self.updateGraphComputingStatus)
             chunk.statusChanged.connect(self._chunksMonitor.onComputeStatusChanged)
+            print("[UIGraph] (updateChunks) -> chunk:", hex(id(chunk)), chunk)
         # provide ChunkMonitor with the update list of chunks
         self.updateChunkMonitor(self._sortedDFSChunks)
         # update graph computing status based on the new list of NodeChunks
         self.updateGraphComputingStatus()
+        print("[UIGraph] (updateChunks) -> done")
 
     def updateChunkMonitor(self, chunks):
         """ Update the list of chunks for status files monitoring. """
         self._chunksMonitor.setChunks(chunks)
 
     def clear(self):
+        print("[UIGraph] (clear)")
         if self._graph:
             self.clearNodeHover()
             self.clearNodeSelection()
@@ -546,7 +553,7 @@ class UIGraph(QObject):
             return
         self._taskManager.requestBlockRestart()
         self._graph.stopExecution()
-        self._taskManager._thread.join()
+        self._taskManager._thread.wait()
 
     @Slot(Node)
     def stopNodeComputation(self, node):
@@ -556,7 +563,7 @@ class UIGraph(QObject):
 
         # Stop the node and wait Task Manager
         node.stopComputation()
-        self._taskManager._thread.join()
+        self._taskManager._thread.wait()
 
     @Slot(Node)
     def cancelNodeComputation(self, node):
@@ -590,6 +597,8 @@ class UIGraph(QObject):
         self._taskManager.submit(self._graph, chosenSubmitter, nodes, submitLabel=self.submitLabel)
 
     def updateGraphComputingStatus(self):
+        for ch in self._sortedDFSChunks:
+            print("[UIGraph] (updateGraphComputingStatus) -> chunk:", hex(id(ch)), ch)
         # update graph computing status
         computingLocally = any([
                                 ch.status.execMode == ExecMode.LOCAL and
@@ -980,6 +989,7 @@ class UIGraph(QObject):
     @Slot()
     def forceNodesStatusUpdate(self):
         """ Force re-evaluation of graph's nodes status. """
+        print("[UIGraph] (forceNodesStatusUpdate)")
         self._graph.updateStatusFromCache(force=True)
 
     @Slot(Attribute, QJsonValue)
@@ -1052,13 +1062,16 @@ class UIGraph(QObject):
     @Slot(int, int)
     def selectNodeByIndex(self, index: int, command=QItemSelectionModel.SelectionFlag.ClearAndSelect):
         """Update selection with node at the given `index` using the specified `command`."""
+        print("[UIGraph] (selectNodeByIndex)", index, command)
         if isinstance(command, int):
             command = QItemSelectionModel.SelectionFlag(command)
 
         self.selectNodesByIndices([index], command)
 
         if self._nodeSelection.isRowSelected(index):
+            print("[UIGraph] (selectNodeByIndex) get selected node at index", index)
             self.selectedNode = self._graph.nodes.at(index)
+            print("[UIGraph] (selectNodeByIndex) -> selected node is", self.selectedNode.label)
 
     @Slot(list)
     @Slot(list, int)
@@ -1087,7 +1100,9 @@ class UIGraph(QObject):
 
     def iterSelectedNodes(self) -> Iterator[Node]:
         """Iterate over the currently selected nodes."""
+        print("[UIGraph] (iterSelectedNodes)")
         for idx in self._nodeSelection.selectedRows():
+            print("[UIGraph] (iterSelectedNodes) _graph.nodes.at", idx.row())
             yield self._graph.nodes.at(idx.row())
 
     @Slot(result=list)

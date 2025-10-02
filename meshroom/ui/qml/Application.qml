@@ -863,6 +863,11 @@ Page {
                             y: 0
                         }
                     }
+                    
+                    MenuItem {
+                        text: "Print Graph"
+                        onTriggered: _reconstruction.printGraph()
+                    }
                 }
                 MenuSeparator { }
                 Action {
@@ -1174,6 +1179,8 @@ Page {
                 readOnly: _reconstruction ? _reconstruction.computing : false
 
                 function viewNode(node, mouse) {
+                    print("[Application] (WorkspaceView>viewNode)")
+
                     // 2D viewer
                     viewer2D.tryLoadNode(node)
 
@@ -1443,6 +1450,7 @@ Page {
                     readOnly: node ? node.locked : false
 
                     onUpgradeRequest: {
+                        console.log("onUpgradeRequest")
                         var n = _reconstruction.upgradeNode(node)
                         _reconstruction.selectedNode = n
                     }                   
@@ -1471,6 +1479,7 @@ Page {
                                 }
                                 
                                 onTriggered: {
+                                    console.log("App: onTriggered")
                                     nodeEditor._selectNodesFromAttributes([nodeEditor.currentAttributes[index]])
                                 }
                             }
