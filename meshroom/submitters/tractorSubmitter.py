@@ -8,7 +8,8 @@ import logging
 import shlex
 from collections import namedtuple
 
-from meshroom.core.submitter import BaseSubmitter
+from meshroom.core.submitter import BaseSubmitter, BaseSubmittedJob
+from meshroom.core.submitter import SubmitterOptions
 
 from tractor.api import author
 
@@ -421,6 +422,21 @@ class Job:
             return {"id": jid, "url": TRACTOR_JOB_URL.format(jid=jid)}
 
 
+class TractorJob(BaseSubmittedJob):
+    """
+    Interface to manipulate the job via Meshroom
+    """
+    
+    def __init__(self, jid):
+        super().__init__(jid, TractorSubmitter)
+        self.jobUrl = TRACTOR_JOB_URL.format(jid=jid)
+    
+    def interrupt(self):
+        raise NotImplementedError("[TractorJob] 'interrupt' is not implemented yet")
+    
+    def resume(self):
+        raise NotImplementedError("[TractorJob] 'resume' is not implemented yet")
+
 
 class TractorSubmitter(BaseSubmitter):
     """
@@ -436,6 +452,7 @@ class TractorSubmitter(BaseSubmitter):
     
     def __init__(self, parent=None):
         super().__init__(name='Tractor', parent=parent)
+        self.addOptions(SubmitterOptions.ALL)
         self.share = os.environ.get('MESHROOM_TRACTOR_SHARE', 'vfx')
         self.prod = os.environ.get('PROD', 'mvg')
         self.reqPackages = get_job_packages()
@@ -447,6 +464,9 @@ class TractorSubmitter(BaseSubmitter):
             self.environment['PROD'] = os.environ['PROD']
         if 'PROD_ROOT' in os.environ:
             self.environment['PROD_ROOT'] = os.environ['PROD_ROOT']
+    
+    def retrieveJob(self, jid) -> TractorJob:
+        return TractorJob(jid)
 
     def createTask(self, meshroomFile, node):
         tags = self.DEFAULT_TAGS.copy()  # copy to not modify default tags
@@ -509,4 +529,6 @@ class TractorSubmitter(BaseSubmitter):
         res = job.submit(share=self.share, dryRun=self.dryRun)
         if self.dryRun:
             return True
-        return len(res) > 0
+        if len(res) == 0:
+            return False
+        return res.get("id")
