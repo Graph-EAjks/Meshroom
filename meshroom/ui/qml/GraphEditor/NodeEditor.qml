@@ -46,7 +46,6 @@ Panel {
     }
 
     function refresh() {
-        console.log("NodeEditor: refresh")
         /**
          * Refresh properties of the Node Editor.
          */
@@ -102,7 +101,6 @@ Panel {
             }
 
             function getLongestChunkTime(chunks) {
-                console.log("getLongestChunkTime")
                 if (chunks.count <= 1)
                     return 0
 

@@ -474,7 +474,7 @@ class TractorSubmitter(BaseSubmitter):
             **optionalArgs)
         return task
 
-    def submit(self, nodes, edges, filepath, submitLabel="{projectName}"):
+    def createJob(self, nodes, edges, filepath, submitLabel="{projectName}"):
         projectName = os.path.splitext(os.path.basename(filepath))[0]
         name = submitLabel.format(projectName=projectName)
         comment = filepath

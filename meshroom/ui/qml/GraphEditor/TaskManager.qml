@@ -138,7 +138,6 @@ Item {
             spacing: 3
 
             function getNbFinishedChunks(chunks) {
-                console.log("getNbFinishedChunks")
                 var nbSuccess = 0
                 for (var i = 0; i < chunks.count; i++) {
                     if (chunks.at(i).statusName === "SUCCESS") {

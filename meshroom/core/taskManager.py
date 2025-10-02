@@ -37,7 +37,6 @@ class TaskThread(QThread):
         return self._state == State.RUNNING
     
     def waitForChunkCreation(self, node):
-        print(f"({node}) waitForChunkCreation...")
         if hasattr(node, "_chunksCreated") and node._chunksCreated:
             return True
             
@@ -163,7 +162,6 @@ class TaskManager(BaseObject):
     @Slot(BaseObject)
     def createChunks(self, node):
         """ Create chunks on main process """
-        print("[TaskManager] (createChunks) node:", node)
         try:
             if not (hasattr(node, '_chunksCreated') and node._chunksCreated):
                 node._createChunks()

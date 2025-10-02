@@ -60,7 +60,6 @@ ListView {
         }
 
         onActiveChanged: {
-            console.log("AttributeEditor: onActiveChanged")
             height = active ? item.implicitHeight : -spacing
         }
 
