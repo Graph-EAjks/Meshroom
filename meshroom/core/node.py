@@ -1493,7 +1493,6 @@ class BaseNode(BaseObject):
         """
         Update node status based on status file content/existence.
         """
-        print("[BaseNode] (updateStatusFromCache)", self.label)
         # Update nodeStatus from cache
         chunkChanged = self.updateNodeStatusFromCache()
         # Create chunks if we found info on them on the node cache
@@ -2101,7 +2100,8 @@ class Node(BaseNode):
         self._createStaticChunks()
     
     def _createStaticChunks(self):
-        print(f"[Node] (_createStaticChunks) <{self.label}> size={self.size}", end="")
+        print(f"[Node] (_createStaticChunks) <{self.label}> uid={self._uid}")
+        print(f"[Node] (_createStaticChunks) -> size={self.size}", end="")
         if self.isParallelized:
             print(" parallelized=1", end="")
             try:

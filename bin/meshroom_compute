@@ -18,7 +18,6 @@ import meshroom.core
 import meshroom.core.graph
 from meshroom.core.submitter import jobManager
 from meshroom.core import submitters
-from meshroom.core.submitter import SubmitterOptionsEnum
 from meshroom.core.node import Status, ExecMode
 
 
@@ -66,7 +65,6 @@ else:
 
 meshroom.core.initPlugins()
 meshroom.core.initNodes()
-meshroom.core.initSubmitters()  # Required to spool child job
 
 graph = meshroom.core.graph.loadGraph(args.graphFile)
 if args.cache:
@@ -82,33 +80,10 @@ if args.node:
         # If not running as "extern", the SUBMITTED status should generate a warning.
         submittedStatuses.append(Status.SUBMITTED)
         
-    chunksToProcess = []
-    job = None
-    
-    # Find job
-    # It's required if we want to spool chunks on different machines
-    if args.extern:
-        jobInfos = node._nodestatus.jobInfos
-        submitterName, jid = jobInfos.get("submitterName"), jobInfos.get("jid")
-        for subName, sub in submitters.items():
-            if submitterName == subName:
-                job = jobManager.retreiveJob(sub, jid)
-                break
-        
-        #   - create map from job/nodes
-        #   - eval chunks
-        # - if we are on a task process
-        #   - do like before
-        pass
-    
     if not node._chunksCreated:
-        # Chunks are not created
-        # TODO : create chunks
-        # TODO : if only one chunk, execute it in the current process
-        # TODO : if multiple chunks
-        #   - if we can, edit the job (will spool additional tasks so we can quickly exit)
-        #   - if we canot edit the job, then execute them serially in the current process
-        pass
+        print(f"Error: Node {node} has been submitted before chunks have been created." \
+               "See file: \"{node.nodeStatusFile}\".")
+        sys.exit(-1)
 
     if not args.forceStatus and not args.forceCompute:
         if args.iteration != -1:

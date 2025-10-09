@@ -1,13 +1,15 @@
 import math
-from enum import Enum
+from enum import IntEnum
 
 from .attribute import ListAttribute, IntParam
 
 
-class Level(Enum):
+class Level(IntEnum):
     NONE = 0
     NORMAL = 1
     INTENSIVE = 2
+    EXTREME = 2
+    SCRIPT=-1
 
 
 class Range:

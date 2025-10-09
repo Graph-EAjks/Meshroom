@@ -87,11 +87,12 @@ class BaseSubmittedJob:
         else:
             raise RuntimeError(f"Submitter {self.__class__.__name__} cannot restart the job")
 
-    def addChunkTasks(self, node):
+    def addChunkTask(self, node, **kwargs):
         if self.submitterOptions.includes(SubmitterOptionsEnum.RESUME_JOB):
-            raise NotImplementedError("'addChunkTasks' method must be implemented in subclasses")
+            raise NotImplementedError("'addChunkTask' method must be implemented in subclasses")
         else:
             raise RuntimeError(f"Submitter {self.__class__.__name__} cannot edit the job")
+    
 
 
 class JobManager(BaseObject):

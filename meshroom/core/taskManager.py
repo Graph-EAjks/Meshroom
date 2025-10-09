@@ -1,3 +1,4 @@
+import traceback
 import logging
 from threading import Thread
 from PySide6.QtCore import QThread, QEventLoop, QTimer
@@ -505,6 +506,7 @@ class TaskManager(BaseObject):
                 self.raiseDependenciesMessage("SUBMITTING")
         except Exception as e:
             logging.error(f"Error on submit : {e}")
+            print(traceback.format_exc())
 
     def submitFromFile(self, graphFile, submitter, toNode=None, submitLabel="{projectName}"):
         """
