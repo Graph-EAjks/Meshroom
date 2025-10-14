@@ -344,7 +344,6 @@ class Reconstruction(UIGraph):
         "PhotometricStereo",
         "PanoramaInit",
         "ColorCheckerDetection",
-        "SphereDetection",
     ]
 
     def __init__(self, undoStack: commands.UndoStack, taskManager: TaskManager, defaultPipeline: str="", parent: QObject=None):
