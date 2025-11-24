@@ -181,7 +181,7 @@ class NodeStatusData(BaseObject):
             logging.warning(f"(loadFromCache) {self.nodeName}: Error while loading status file {statusFile}: {e}")
             self.reset()
 
-    @property 
+    @property
     def nbChunks(self):
         nbBlocks = self.chunks.nbBlocks if self.chunks else -1
         return nbBlocks
@@ -190,15 +190,15 @@ class NodeStatusData(BaseObject):
         if not self.chunks:
             return []
         ranges = []
-        for i in range(self.chunks.nbBlocks): 
+        for i in range(self.chunks.nbBlocks):
             ranges.append(desc.Range(
-                iteration=i, 
-                blockSize=self.chunks.blockSize, 
-                fullSize=self.chunks.fullSize, 
+                iteration=i,
+                blockSize=self.chunks.blockSize,
+                fullSize=self.chunks.fullSize,
                 nbBlocks=self.chunks.nbBlocks
             ))
         return ranges
-    
+
     def setChunks(self, chunks):
         blockSize, fullSize, nbBlocks = 1, 1, 1
         for c in chunks:
@@ -268,7 +268,7 @@ class ChunkStatusData(BaseObject):
         self.mrNodeType: MrNodeType = MrNodeType.NONE
         self.execMode: ExecMode = ExecMode.NONE
         self.resetDynamicValues()
-    
+
     def initStartCompute(self):
         import platform
         self.computeSessionUid = meshroom.core.sessionUid
@@ -504,12 +504,14 @@ class NodeChunk(BaseObject):
 
     def getExecModeName(self):
         return self._status.execMode.name
-    
+
     def shouldMonitorChanges(self):
-        """ Check whether we should monitor changes in minimal mode 
+        """
+        Check whether we should monitor changes in minimal mode.
         Only chunks that are run externally or local_isolated should be monitored,
         when run locally, status changes are already notified.
-        Chunks with an ERROR status may be re-submitted externally and should thus still be monitored
+        Chunks with an ERROR status may be re-submitted externally and should thus still be
+        monitored.
         """
         return (self.isExtern() and self._status.status in (Status.SUBMITTED, Status.RUNNING, Status.ERROR)) or \
                (self.node.getMrNodeType() == MrNodeType.NODE and self._status.status in (Status.SUBMITTED, Status.RUNNING))
@@ -520,7 +522,7 @@ class NodeChunk(BaseObject):
         """
         # TODO : If this is a placeholder chunk
         # Then we shouldn't do anything here
-        
+
         statusFile = self.getStatusFile()
         oldStatus = self._status.status
         # No status file => reset status to Status.None
@@ -824,7 +826,7 @@ class BaseNode(BaseObject):
         self._locked: bool = False
         self._duplicates = ListModel(parent=self)  # list of nodes with the same uid
         self._hasDuplicates: bool = False
-        
+
         self._nodeStatus: NodeStatusData = NodeStatusData(self._name, nodeType, self.packageName,
                                                           self.packageVersion, self.getMrNodeType())
         self.nodeStatusFileLastModTime = -1
@@ -1510,9 +1512,9 @@ class BaseNode(BaseObject):
     @property
     def nodeStatusFile(self):
         return os.path.join(self.graph.cacheDir, self.internalFolder, "nodeStatus")
-    
+
     def shouldMonitorChanges(self):
-        """ Check whether we should monitor changes in minimal mode 
+        """ Check whether we should monitor changes in minimal mode.
         Only chunks that are run externally or local_isolated should be monitored,
         when run locally, status changes are already notified.
         Chunks with an ERROR status may be re-submitted externally and should thus still be monitored
@@ -2191,7 +2193,7 @@ class Node(BaseNode):
         }
 
     def _resetChunks(self):
-        """ Set chunks on the node 
+        """ Set chunks on the node
         # TODO : Maybe don't delete chunks if we will recreate them as before ?
         """
         if isinstance(self.nodeDesc, desc.InputNode):
@@ -2230,7 +2232,7 @@ class Node(BaseNode):
             self._chunksCreated = False
             self.setSize(0)
             self._chunks.setObjectList([])
-        # Create chunks when possible 
+        # Create chunks when possible
         self.chunksCreatedChanged.emit()
         self.chunksChanged.emit()
         self.globalStatusChanged.emit()
