@@ -1,3 +1,7 @@
+# Linting: Remove trailing whitespaces
+af397c2ab6b9a8bc446a81ce7fd162a351895673
+# [core] Linting: Remove all trailing whitespaces
+d12e434998dcdbe9d014bccae4f9294665bd96d4
 # [tests] Linting: Remove trailing whitespaces
 5fe886b6b08fa19082dc0e1bf837fa34c2e2de2d
 # [core] Linting: Remove remaining trailing whitespaces
