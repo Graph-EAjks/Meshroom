@@ -109,7 +109,6 @@ Panel {
                     readOnly = true
                     selectByMouse = false
                     const newNodeName = _reconstruction.renameNode(node, text)
-                    console.log(newNodeName)
                 }
 
             }
