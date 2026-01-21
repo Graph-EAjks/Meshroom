@@ -23,30 +23,7 @@ Panel {
 
     property variant nodeName: node !== null ? node.name : undefined
     property string displayNodeName: node !== null ? node.name : ""
-    property string validatedNodeName: displayNodeName
-    property string displayNodeType: ""
-
-    function updateNodeNameDisplay() {
-        if (_reconstruction.selectedNode) {
-            const nodeName = _reconstruction.selectedNode.name
-            root.displayNodeName = nodeName
-            root.validatedNodeName = nodeName
-            // Set the display node type only if it is not contained in the node name
-            const nodeType = _reconstruction.selectedNode.nodeType
-            root.displayNodeType = nodeName.startsWith(nodeType + "_") ? "" : nodeType
-        }
-    }
-
-    Connections {
-        target: _reconstruction
-        function onSelectedNodeChanged() {
-            updateNodeNameDisplay()
-        }
-    }
-
-    onNodeNameChanged: {
-        updateNodeNameDisplay()
-    }
+    property string validatedNodeName: node.nodeLabel
 
     signal attributeDoubleClicked(var mouse, var attribute)
     signal inAttributeClicked(var srcItem, var mouse, var inAttributes)
@@ -202,8 +179,8 @@ Panel {
 
             // Show node type if the node name does not start with "nodeType_"
             Label {
-                text: "(" + root.displayNodeType + ")"
-                visible: root.displayNodeType !== "" && _reconstruction.selectedNode
+                visible: node.nodeType
+                text: `(${nodeType})`
                 topPadding: 4
                 bottomPadding: 4
             }

@@ -25,7 +25,7 @@ Item {
     property bool hovered: false
     property bool dragging: mouseArea.drag.active
     /// Node label
-    property string nodeLabel: node ? node.label : ""
+    //property string nodeLabel: node.label
     /// Combined x and y
     property point position: Qt.point(x, y)
     /// Styling
@@ -91,9 +91,9 @@ Item {
         }
         function onNameChanged() {
             // HACK: Make sure when the node name changes the node label is updated
-            root.nodeLabel = ""
+            //root.nodeLabel = ""
             // Restore binding to root.node.label
-            root.nodeLabel = Qt.binding(function() { return root.node.label; })
+            //root.nodeLabel = Qt.binding(function() { return root.node.label; })
         }
     }
 
@@ -407,7 +407,7 @@ Item {
                         Label {
                             id: nodeLabel
                             Layout.fillWidth: true
-                            text: root.nodeLabel
+                            text: node.nodeLabel
                             padding: 4
                             color: root.mainSelected ? activePalette.highlightedText : activePalette.text
                             elide: Text.ElideMiddle

@@ -2114,6 +2114,8 @@ class BaseNode(BaseObject):
     # Whether the node contains a ShapeAttribute, a ShapeListAttribute or a shape File.
     hasDisplayableShape = Property(bool, _hasDisplayableShape, constant=True)
 
+    nodeLabel = Property(str, getLabel, notify=nodeNameChanged)
+
 
 class Node(BaseNode):
     """
