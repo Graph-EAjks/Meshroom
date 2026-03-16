@@ -274,6 +274,7 @@ class BaseNode(object):
         """
         pass
 
+    @property
     def _hasPreprocess(self):
         """ Returns True if the class has a preprocess """
         return not self.preprocess.__annotations__.get("disabled_preprocess", False)
@@ -287,6 +288,7 @@ class BaseNode(object):
         """
         pass
 
+    @property
     def _hasPostprocess(self):
         """ Returns True if the class has a postprocess """
         return not self.postprocess.__annotations__.get("disabled_postprocess", False)
