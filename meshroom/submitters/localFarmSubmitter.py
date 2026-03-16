@@ -78,7 +78,7 @@ def getRequestPackages(packagesDelimiter="=="):
     return list(reqPackages)
 
 
-def rezWrapCommand(cmd, useCurrentContext=False, useRequestedContext=True, otherRezPkg: list[str] = None):
+def rezWrapCommand(cmd, useCurrentContext=False, useRequestedContext=True, otherRezPkg: list[str] = None, additionalEnv: dict=None):
     """ Wrap command to be runned using rez.
     :param cmd: command to run
     :type cmd: bool
@@ -108,7 +108,11 @@ def rezWrapCommand(cmd, useCurrentContext=False, useRequestedContext=True, other
             rezBin = os.path.join(os.environ["REZ_PACKAGES_ROOT"], "bin/rez")
         elif shutil.which("rez"):
             rezBin = shutil.which("rez")
-        return f"{rezBin} env {packagesStr} -- {cmd}"
+        addEnvCmd = ""
+        if additionalEnv:
+            envVars = " ".join([f'{k}="{v}"' for k, v in additionalEnv.items()])
+            addEnvCmd = f"env {envVars} "
+        return f"{rezBin} env {packagesStr} -- {addEnvCmd}{cmd}"
     return cmd
 
 
@@ -236,33 +240,44 @@ class LocalFarmSubmitter(BaseSubmitter):
                 it = [Chunk(i, item[0], item[-1]) for i, item in enumerate(slices) if i not in ignoreIterations]
         return it
 
-    @staticmethod
-    def getExpandWrappedCmd(cmdArgs, rezPackages):
+    def getExpandWrappedCmd(self, cmdArgs, rezPackages):
         # Wrap with create_chunks
         cmdBin = wrapMeshroomBin("meshroom_createChunks")
         cmd = f"{cmdBin} --submitter LocalFarm {cmdArgs}"
         # Wrap with rez
-        cmd = rezWrapCommand(cmd, otherRezPkg=rezPackages)
+        cmd = rezWrapCommand(cmd, otherRezPkg=rezPackages, additionalEnv=self.jobEnv)
         return cmd
 
     def createFarmTask(self, meshroomFile: str, orderedTask: OrderedTask, createdTasks: Dict[OrderedTask, Task]) -> Task:
         metadata = dict()
         if orderedTask.node:
-            metadata = {"nodeUid": orderedTask.node._uid, "iteration": orderedTask.iteration}
+            metadata = {"nodeUid": orderedTask.node._uid}
         
+        if orderedTask.iteration >= 0:
+            metadata["iteration"] = orderedTask.iteration
+        elif orderedTask.taskType == OrderedTaskType.PREPROCESS:
+            metadata["iteration"] = "preprocess"
+        elif orderedTask.taskType == OrderedTaskType.POSTPROCESS:
+            metadata["iteration"] = "postprocess"
+
         if orderedTask.taskType == OrderedTaskType.PLACEHOLDER:
             return Task(name=orderedTask.node.name if orderedTask.node else "", command="", metadata=metadata)
         
         cmdArgs = f"--node {orderedTask.node.name} \"{meshroomFile}\" --extern"
-        metadata = {"nodeUid": orderedTask.node._uid, "iteration": orderedTask.iteration}
         
         if orderedTask.taskType == OrderedTaskType.EXPANDING:
             cmd = self.getExpandWrappedCmd(cmdArgs, self.reqPackages)
             task = Task(name=orderedTask.node.name, command=cmd, metadata=metadata, env=self.jobEnv)
         else:
             cmdBin = wrapMeshroomBin("meshroom_compute")
-            cmd = f"{cmdBin} {cmdArgs} --iteration {orderedTask.iteration}"
-            cmd = rezWrapCommand(cmd, otherRezPkg=self.reqPackages)
+            cmd = f"{cmdBin} {cmdArgs}"
+            if orderedTask.taskType == OrderedTaskType.PREPROCESS:
+                cmd += f" --preprocess"
+            elif orderedTask.taskType == OrderedTaskType.POSTPROCESS:
+                cmd += f" --postprocess"
+            elif orderedTask.taskType == OrderedTaskType.CHUNK:
+                cmd += f" --iteration {orderedTask.iteration}"
+            cmd = rezWrapCommand(cmd, otherRezPkg=self.reqPackages, additionalEnv=self.jobEnv)
             task = Task(name=orderedTask.node.name, command=cmd, metadata=metadata, env=self.jobEnv)
 
         return task
@@ -272,7 +287,7 @@ class LocalFarmSubmitter(BaseSubmitter):
         name = submitLabel.format(projectName=projectName)
         # Create job
         job = Job(name)
-        
+
         # Create tasks
         orderedTasks.display()
         createdTasks: Dict[OrderedTask, Task] = dict()
@@ -280,16 +295,17 @@ class LocalFarmSubmitter(BaseSubmitter):
             if taskToCreate in createdTasks.keys():
                 continue
             createdTask = self.createFarmTask(filepath, taskToCreate, createdTasks)
+            job.addTask(createdTask)
             createdTasks[taskToCreate] = createdTask
-        
+
         for orderedTask, task in createdTasks.items():
             print(orderedTask, "->", task)
-        
+
         for orderedTask, task in createdTasks.items():
             deps = [createdTasks.get(t) for t in orderedTask.dependencies]
             for dependency in deps:
-                job.addTaskDependency(dependency, task)
-        
+                job.addTaskDependency(task, dependency)
+    
         # Submit job
         engine = LocalFarmEngine(self.farmPath)
         res = job.submit(engine)
@@ -328,7 +344,7 @@ class LocalFarmSubmitter(BaseSubmitter):
             metadata = {"nodeUid": node._uid, "iteration": chunk.iteration}
             cmdBin = wrapMeshroomBin("meshroom_compute")
             cmd = f"{cmdBin} {cmdArgs} --iteration {chunk.iteration}"
-            cmd = rezWrapCommand(cmd, otherRezPkg=self.reqPackages)
+            cmd = rezWrapCommand(cmd, otherRezPkg=self.reqPackages, additionalEnv=self.jobEnv)
             print("Additional chunk task command: ", cmd)
             task = Task(name=name, command=cmd, metadata=metadata, env=taskEnv)
             engine.create_additional_task(currentJid, currentTid, task)
