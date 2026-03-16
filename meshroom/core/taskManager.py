@@ -97,8 +97,9 @@ class TaskThread(QThread):
                 multiChunks = len(node.chunks) > 1
             except TypeError:
                 continue
+            
 
-            node.preprocess()
+            node.preprocess(self.forceCompute)
             for cId, chunk in enumerate(node.chunks):
                 if chunk.isFinishedOrRunning() or not self.isRunning():
                     continue
@@ -130,7 +131,7 @@ class TaskThread(QThread):
                                 # Node already removed (for instance a global clear of _nodesToProcess)
                                 pass
                             n.clearSubmittedChunks()
-            node.postprocess()
+            node.postprocess(self.forceCompute)
 
             if stopAndRestart:
                 break
